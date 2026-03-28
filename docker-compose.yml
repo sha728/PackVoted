@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: packvote
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/packvote
+      - REDIS_URL=redis://redis:6379/0
+      - FRONTEND_URL=http://localhost:3000
+      - SMTP_USERNAME=packvoted@gmail.com
+      - SMTP_PASSWORD=oszqqpiemvmafzeg
+      - GEMINI_API_KEY=AIzaSyBJqxSMNns6afAwYysVyzpaBT70h4DnACI
+      - GOOGLE_MAPS_API_KEY=AIzaSyCq4Jvh5HavuGG0w8DNzTn8YztePqurr28
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - db
+      - redis
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  postgres_data:

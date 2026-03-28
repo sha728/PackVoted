@@ -1,0 +1,9 @@
+.env
+node_modules/
+dist/
+build/
+backend/venv/
+backend/__pycache__/
+*.pyc
+.DS_Store
+.gemini/
