@@ -29,7 +29,7 @@ function serializeParams(params) {
 }
 
 const client = axios.create({
-  baseURL: '',
+  baseURL: import.meta.env.VITE_API_URL || '',
   headers: { 'Content-Type': 'application/json' },
   timeout: 30_000,
   paramsSerializer: { serialize: serializeParams },
