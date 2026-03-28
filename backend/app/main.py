@@ -205,6 +205,17 @@ def generate_basic_itinerary(destination: dict, days: int) -> dict:
         "travel_tips": ["Book accommodations in advance", "Carry cash for small vendors"]
     }
 
+# ==================== HELPERS ====================
+
+def send_trip_emails(participants, trip):
+    """Background task to send preference form emails."""
+    email_service = EmailService()
+    for p in participants:
+        try:
+            email_service.send_preference_form(p, trip)
+        except Exception as e:
+            logging.error(f"Failed to send email to {p.email}: {e}")
+
 # ==================== TRIP ENDPOINTS ====================
 
 @app.post("/api/trips")
@@ -218,6 +229,7 @@ def create_trip(
     budget_min: float = 2000,
     budget_max: float = 5000,
     participant_emails: List[str] = Query([]),
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """Create a new trip and add participants."""
@@ -267,8 +279,8 @@ def create_trip(
     
     db.commit()
     
-    for p in participants_added:
-        email_service.send_preference_form(p, trip)
+    # Send emails in the background to prevent timeout
+    background_tasks.add_task(send_trip_emails, participants_added, trip)
     
     return {
         "trip_id": str(trip.id),
