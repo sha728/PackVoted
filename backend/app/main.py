@@ -122,7 +122,7 @@ def generate_gemini_itinerary(destination, days, weather_data, group_preferences
     
     try:
         genai.configure(api_key=gemini_api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
         
         weather_summary = ""
         if weather_data:
