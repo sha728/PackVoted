@@ -207,10 +207,17 @@ def generate_basic_itinerary(destination: dict, days: int) -> dict:
 
 # ==================== HELPERS ====================
 
-def send_trip_emails(participants, trip):
-    """Background task to send preference form emails."""
+def send_trip_emails(participants_data: list, trip_data: dict):
+    """Background task to send preference form emails.
+    
+    Accepts plain dicts instead of SQLAlchemy ORM objects to avoid
+    DetachedInstanceError when the DB session closes before the task runs.
+    """
+    import types
     email_service = EmailService()
-    for p in participants:
+    trip = types.SimpleNamespace(**trip_data)
+    for p_data in participants_data:
+        p = types.SimpleNamespace(**p_data)
         try:
             email_service.send_preference_form(p, trip)
         except Exception as e:
@@ -279,8 +286,25 @@ def create_trip(
     
     db.commit()
     
+    # Serialize to plain dicts BEFORE session closes to avoid DetachedInstanceError
+    participants_data = [
+        {
+            "email": p.email,
+            "name": p.name,
+            "form_token": p.form_token,
+        }
+        for p in participants_added
+    ]
+    trip_data = {
+        "name": trip.name,
+        "date_start": trip.date_start,
+        "date_end": trip.date_end,
+        "budget_min": trip.budget_min,
+        "budget_max": trip.budget_max,
+    }
+    
     # Send emails in the background to prevent timeout
-    background_tasks.add_task(send_trip_emails, participants_added, trip)
+    background_tasks.add_task(send_trip_emails, participants_data, trip_data)
     
     return {
         "trip_id": str(trip.id),
