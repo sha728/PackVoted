@@ -220,8 +220,9 @@ def send_trip_emails(participants, trip):
 
 @app.post("/api/trips")
 def create_trip(
-    name: str,
-    creator_email: str,
+    background_tasks: BackgroundTasks,
+    name: str = Query(...),
+    creator_email: str = Query(...),
     creator_name: Optional[str] = None,
     date_start: Optional[str] = None,
     date_end: Optional[str] = None,
@@ -229,7 +230,6 @@ def create_trip(
     budget_min: float = 2000,
     budget_max: float = 5000,
     participant_emails: List[str] = Query([]),
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """Create a new trip and add participants."""
