@@ -21,14 +21,11 @@ services:
     build: ./backend
     ports:
       - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/packvote
-      - REDIS_URL=redis://redis:6379/0
-      - FRONTEND_URL=http://localhost:3000
-      - SMTP_USERNAME=packvoted@gmail.com
-      - SMTP_PASSWORD=oszqqpiemvmafzeg
-      - GEMINI_API_KEY=AIzaSyBJqxSMNns6afAwYysVyzpaBT70h4DnACI
-      - GOOGLE_MAPS_API_KEY=AIzaSyCq4Jvh5HavuGG0w8DNzTn8YztePqurr28
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - FROM_EMAIL=${FROM_EMAIL}
+      - FRONTEND_URL=${FRONTEND_URL}
     volumes:
       - ./backend:/app
     depends_on:
