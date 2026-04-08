@@ -67,7 +67,7 @@ class DestinationScorer:
                 basic_result['conflict_warning'] = "High disagreement in group - consider alternatives"
             
             # Adjusted score: 70% average + 30% minimum
-            adjusted_score = (basic_result['total_score'] * 0.7) + (fairness['min_score'] * 0.3)
+            adjusted_score = min(1.0, (basic_result['total_score'] * 0.7) + (fairness['min_score'] * 0.3))
             
             scored.append({
                 'destination': dest,
@@ -131,7 +131,7 @@ class DestinationScorer:
             range_size = hard['budget_max'] - hard['budget_min']
             if range_size > 0:
                 position = (hard['budget_max'] - dest['daily_cost']) / range_size
-                scores['budget'] = 0.5 + (position * 0.5)
+                scores['budget'] = min(1.0, max(0.0, 0.5 + (position * 0.5)))
             else:
                 scores['budget'] = 1.0
         
@@ -144,11 +144,11 @@ class DestinationScorer:
         if sum(user_vibe_vec) == 0:
             scores['vibe'] = 1.0
         else:
-            scores['vibe'] = cosine_similarity(dest_vibe_vec, user_vibe_vec)
+            scores['vibe'] = min(1.0, max(0.0, cosine_similarity(dest_vibe_vec, user_vibe_vec)))
         
         # 4. Activity alignment (FIXED - now properly assigned)
         dest_activity = self._estimate_activity_level(dest['activities'])
-        scores['activity'] = 1 - abs(dest_activity - soft['activity_level'])
+        scores['activity'] = min(1.0, max(0.0, 1 - abs(dest_activity - soft['activity_level'])))
         
         # 5. Duration fit
         if hard['trip_duration'] < dest['duration'] - 1:
