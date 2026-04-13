@@ -18,11 +18,22 @@ except ImportError:
     GEMINI_AVAILABLE = False
 
 from .database import get_db, init_db
-from .models import Trip, Participant, TripStatus
+from .models import Trip, Participant, TripStatus, User
 from .scoring import DestinationScorer, generate_explanation
 from .email_service import EmailService
+from .auth import get_password_hash, verify_password, create_access_token, get_current_user, get_current_user_required
+from pydantic import BaseModel
 
 load_dotenv()
+
+class UserCreate(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
 
 import logging
 logging.basicConfig(
@@ -35,7 +46,7 @@ app = FastAPI(title="PackVote API", version="1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -223,6 +234,81 @@ def send_trip_emails(participants_data: list, trip_data: dict):
         except Exception as e:
             logging.error(f"Failed to send email to {p.email}: {e}")
 
+# ==================== AUTH ENDPOINTS ====================
+
+@app.post("/api/auth/register")
+def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    try:
+        db_user = db.query(User).filter(User.email == user.email).first()
+        if db_user:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        hashed_password = get_password_hash(user.password)
+        new_user = User(email=user.email, name=user.name, hashed_password=hashed_password)
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        
+        token = create_access_token(data={"sub": new_user.email})
+        
+        # Best-effort: claim past trips and participations by email
+        # (may fail if migration hasn't run yet - that's OK)
+        try:
+            db.query(Trip).filter(
+                Trip.creator_email == new_user.email,
+                Trip.creator_id.is_(None)
+            ).update({"creator_id": new_user.id}, synchronize_session="fetch")
+            
+            db.query(Participant).filter(
+                Participant.email == new_user.email,
+                Participant.user_id.is_(None)
+            ).update({"user_id": new_user.id}, synchronize_session="fetch")
+            db.commit()
+        except Exception as claim_err:
+            logging.warning(f"Could not claim past trips for {new_user.email}: {claim_err}")
+            db.rollback()
+        
+        return {"access_token": token, "token_type": "bearer", "user": {"id": str(new_user.id), "name": new_user.name, "email": new_user.email}}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Register error: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/auth/login")
+def login_user(user: UserLogin, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.email == user.email).first()
+    if not db_user or not verify_password(user.password, db_user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    token = create_access_token(data={"sub": db_user.email})
+    return {"access_token": token, "token_type": "bearer", "user": {"id": str(db_user.id), "name": db_user.name, "email": db_user.email}}
+
+@app.get("/api/auth/me")
+def get_me(current_user: User = Depends(get_current_user_required)):
+    return {"id": str(current_user.id), "name": current_user.name, "email": current_user.email}
+
+@app.get("/api/users/dashboard")
+def get_user_dashboard(current_user: User = Depends(get_current_user_required), db: Session = Depends(get_db)):
+    created_trips = db.query(Trip).filter(Trip.creator_id == current_user.id).order_by(Trip.created_at.desc()).all()
+    
+    participations = db.query(Participant).filter(Participant.user_id == current_user.id).all()
+    trip_ids = [p.trip_id for p in participations]
+    invited_trips = db.query(Trip).filter(Trip.id.in_(trip_ids), Trip.creator_id != current_user.id).order_by(Trip.created_at.desc()).all()
+    
+    return {
+        "created": [
+            {"id": str(t.id), "name": t.name, "status": t.status.value, "date_start": t.date_start.isoformat() if t.date_start else None} 
+            for t in created_trips
+        ],
+        "invited": [
+            {"id": str(t.id), "name": t.name, "status": t.status.value, "date_start": t.date_start.isoformat() if t.date_start else None} 
+            for t in invited_trips
+        ]
+    }
+
 # ==================== TRIP ENDPOINTS ====================
 
 @app.post("/api/trips")
@@ -237,7 +323,8 @@ def create_trip(
     budget_min: float = 2000,
     budget_max: float = 5000,
     participant_emails: List[str] = Query([]),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
 ):
     """Create a new trip and add participants."""
     
@@ -253,7 +340,8 @@ def create_trip(
         duration_days=duration_days,
         budget_min=budget_min,
         budget_max=budget_max,
-        status=TripStatus.FORMS_SENT
+        status=TripStatus.FORMS_SENT,
+        creator_id=current_user.id if current_user else None
     )
     db.add(trip)
     db.flush()
@@ -263,6 +351,7 @@ def create_trip(
     
     creator = Participant(
         trip_id=trip.id,
+        user_id=current_user.id if current_user else None,
         email=creator_email,
         name=creator_name,
         form_token=str(uuid.uuid4()),
@@ -274,8 +363,10 @@ def create_trip(
     
     for email in participant_emails:
         if email != creator_email:
+            invited_user = db.query(User).filter(User.email == email).first()
             participant = Participant(
                 trip_id=trip.id,
+                user_id=invited_user.id if invited_user else None,
                 email=email,
                 form_token=str(uuid.uuid4()),
                 budget_ceiling=budget_max,

@@ -8,6 +8,14 @@ from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
 
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    name = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
 class TripStatus(PyEnum):
     CREATED = "created"
     FORMS_SENT = "forms_sent"
@@ -43,6 +51,8 @@ class Trip(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
+    creator_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    creator = relationship("User", backref="created_trips")
     participants = relationship("Participant", back_populates="trip", cascade="all, delete-orphan")
 
 class Participant(Base):
@@ -77,3 +87,6 @@ class Participant(Base):
     weights = Column(JSON, default=lambda: {"budget": 0.25, "weather": 0.25, "activities": 0.25, "vibe": 0.25})
     
     trip = relationship("Trip", back_populates="participants")
+    
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    user = relationship("User", backref="participations")

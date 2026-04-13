@@ -87,7 +87,7 @@ class DestinationScorer:
         return {
             'budget_max': min((p.budget_ceiling or float('inf')) for p in participants),
             'budget_min': max((p.budget_floor or 0) for p in participants),
-            'avoided_destinations': list(set().union(*[set(p.avoided_destinations or []) for p in participants])),
+            'avoided_destinations': [d.strip().lower() for d in list(set().union(*[set(p.avoided_destinations or []) for p in participants]))],
             'accessibility_needs': list(set().union(*[set(p.accessibility_needs or []) for p in participants])),
             'trip_duration': trip.duration_days
         }
@@ -158,8 +158,9 @@ class DestinationScorer:
         else:
             scores['duration'] = 1.0
         
-        # 6. Check avoided destinations
-        if dest['name'] in hard['avoided_destinations'] or dest['state'] in hard['avoided_destinations']:
+        # 6. Check avoided destinations (Case-insensitive)
+        avoided = [a.lower() for a in hard.get('avoided_destinations', [])]
+        if dest['name'].lower() in avoided or dest['state'].lower() in avoided:
             violations += 10
             violation_details.append("Explicitly avoided")
         

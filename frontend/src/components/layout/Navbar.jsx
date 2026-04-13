@@ -1,4 +1,5 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 /**
  * Sticky glassmorphic top navigation bar.
@@ -18,6 +19,13 @@ function isLinkActive(linkTo, pathname) {
 
 export default function Navbar() {
   const { pathname } = useLocation();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-surface-200 bg-white/80 backdrop-blur-md">
@@ -58,6 +66,27 @@ export default function Navbar() {
               </li>
             );
           })}
+          
+          {user ? (
+            <>
+              <li>
+                <Link to="/dashboard" className="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-surface-600 hover:text-surface-900 hover:bg-surface-100">
+                  Dashboard
+                </Link>
+              </li>
+              <li>
+                <button onClick={handleLogout} className="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-surface-600 hover:text-surface-900 hover:bg-surface-100">
+                  Log Out
+                </button>
+              </li>
+            </>
+          ) : (
+            <li>
+              <Link to="/login" className="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-surface-600 hover:text-surface-900 hover:bg-surface-100">
+                Log In
+              </Link>
+            </li>
+          )}
 
           {/* Primary CTA — always visible */}
           <li>

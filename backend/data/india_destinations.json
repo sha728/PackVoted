@@ -744,18 +744,6 @@
   "duration": 2
 },
 {
-  "name": "Mysore",
-  "state": "Karnataka",
-  "best_time": "Throughout the year",
-  "daily_cost": 1800,
-  "climate": "warm",
-  "vibes": ["palace city", "heritage", "yoga capital", "gardens"],
-  "activities": ["mysore palace", "chamundi hills", "brindavan gardens", "zoo visit"],
-  "lat": 12.2958,
-  "lon": 76.6394,
-  "duration": 2
-},
-{
   "name": "Jim Corbett National Park",
   "state": "Uttarakhand",
   "best_time": "Mid October to Mid June",

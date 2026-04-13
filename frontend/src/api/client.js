@@ -36,6 +36,18 @@ const client = axios.create({
 });
 
 /* ──────────────────────────────────────────────────────────
+   Request interceptor
+   Attaches the JWT token to requests if logged in.
+   ────────────────────────────────────────────────────────── */
+client.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+/* ──────────────────────────────────────────────────────────
    Response interceptor
    Normalises every non-2xx error into a plain JS object:
    { message: string, status: number }
